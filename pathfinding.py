@@ -7,7 +7,6 @@ from collections import deque, namedtuple
 ALGOS = ("A*", "GBFS")
 DIRS = ((1, 0), (-1, 0), (0, 1), (0, -1))
 
-
 Result = namedtuple("Result", "path nodes ms explored ok algo")
 
 
@@ -28,7 +27,7 @@ def search(walk, start, goal, algo="A*"):
     """Jalankan A* (f = g + h) atau GBFS (f = h)."""
     t0 = time.perf_counter()
     astar = algo == "A*"
-    counter = itertools.count()          
+    counter = itertools.count()
     h0 = manhattan(start, goal)
     heap = [(h0, h0, next(counter), start)]
     g = {start: 0}
@@ -52,7 +51,7 @@ def search(walk, start, goal, algo="A*"):
             h = manhattan(nb, goal)
             if astar:
                 ng = g[cur] + 1
-                if ng < g.get(nb, 1 << 30):       
+                if ng < g.get(nb, 1 << 30):
                     g[nb] = ng
                     parent[nb] = cur
                     heapq.heappush(heap, (ng + h, h, next(counter), nb))
@@ -74,7 +73,6 @@ def search(walk, start, goal, algo="A*"):
 
 
 def bfs_distances(walk, start):
-    """Jarak (jumlah langkah) dari start ke semua sel yang terjangkau."""
     dist = {start: 0}
     q = deque([start])
     while q:
@@ -86,7 +84,6 @@ def bfs_distances(walk, start):
     return dist
 
 
-# benchmark
 def make_scenarios(maze_walk, w=21, h=15):
     def empty():
         return [[0 < x < w - 1 and 0 < y < h - 1 for x in range(w)] for y in range(h)]
@@ -121,10 +118,10 @@ def make_scenarios(maze_walk, w=21, h=15):
 
 
 def run_benchmark(maze_walk, seed=1, pairs=40):
-    """Uji kedua algoritma pada kondisi identik (grid, start, goal sama)."""
     rows = []
     for name, grid in make_scenarios(maze_walk):
-        cells = [(x, y) for y, r in enumerate(grid) for x, v in enumerate(r) if v]
+        cells = [(x, y) for y, r in enumerate(grid)
+                for x, v in enumerate(r) if v]
         rnd = random.Random(seed)
         tests = []
         while len(tests) < pairs:
