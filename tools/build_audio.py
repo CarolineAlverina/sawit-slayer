@@ -8,7 +8,6 @@ OUT = Path(__file__).resolve().parent.parent / "audio"
 RNG = np.random.default_rng(7)
 
 
-# dasar suara
 def t_axis(dur):
     return np.arange(int(SR * dur)) / SR
 
@@ -103,14 +102,14 @@ def mix(*tracks):
     return out
 
 
-# efek suara (SFX)
 def sfx_click():
     d = 0.07
     return fade_out(square(880, d) * env(int(SR * d), decay=0.03))
 
 
 def sfx_start():
-    parts = [square(note(m), 0.09) * env(int(SR * 0.09), decay=0.05) for m in (60, 64, 67, 72)]
+    parts = [square(note(m), 0.09) * env(int(SR * 0.09), decay=0.05)
+             for m in (60, 64, 67, 72)]
     return fade_out(seq(parts))
 
 
@@ -120,7 +119,7 @@ def sfx_slash():
     n = int(SR * d)
     whoosh = noise(d)
     whoosh = lowpass(whoosh, 3) - lowpass(whoosh, 40)
-    whoosh *= np.sin(np.pi * np.linspace(0, 1, n)) ** 1.5 
+    whoosh *= np.sin(np.pi * np.linspace(0, 1, n)) ** 1.5
     ping = sweep(2400, 900, d) * env(n, decay=0.06) * 0.25
     return fade_out(whoosh * 1.4 + ping)
 
@@ -167,33 +166,34 @@ def sfx_hit():
 
 def sfx_win():
     parts = [square(note(m), 0.14) * env(int(SR * 0.14), decay=0.09)
-            for m in (60, 64, 67, 72, 67, 72)]
+             for m in (60, 64, 67, 72, 67, 72)]
     parts.append(mix(*[tri(note(m), 0.9) * env(int(SR * 0.9), decay=0.5)
-                    for m in (60, 64, 67, 72)]))
+                       for m in (60, 64, 67, 72)]))
     return fade_out(np.concatenate(parts), 0.05)
 
 
 def sfx_lose():
     parts = [square(note(m), 0.22) * env(int(SR * 0.22), decay=0.14)
-            for m in (67, 63, 60)]
-    parts.append(sweep(note(55), note(43), 0.9, "square") * env(int(SR * 0.9), decay=0.5))
+             for m in (67, 63, 60)]
+    parts.append(sweep(note(55), note(43), 0.9, "square")
+                 * env(int(SR * 0.9), decay=0.5))
     return fade_out(np.concatenate(parts), 0.05)
 
 
 def sfx_info():
     """Papan info muncul: dua nada lembut."""
-    parts = [tri(note(m), 0.16) * env(int(SR * 0.16), decay=0.1) for m in (76, 81)]
+    parts = [tri(note(m), 0.16) * env(int(SR * 0.16), decay=0.1)
+             for m in (76, 81)]
     return fade_out(np.concatenate(parts))
 
 
-# musik
 BPM = 128
 BEAT = 60 / BPM
 BAR = 4 * BEAT
 
 
 def render_music(chords, bass_roots, melody, lead_wave="square", bass_oct=-24,
-                drums=True, lead_vol=0.30, arp=True):
+                 drums=True, lead_vol=0.30, arp=True):
     """Susun musik per birama.
 
     chords      : daftar akor (tiga nada MIDI) per birama
@@ -212,7 +212,7 @@ def render_music(chords, bass_roots, melody, lead_wave="square", bass_oct=-24,
 
     for bi, (chord, root, mel) in enumerate(zip(chords, bass_roots, melody)):
         t0 = bi * BAR
-        # bass:
+
         for k in range(8):
             d = BEAT / 2
             x = tri(note(root + bass_oct), d) * env(int(SR * d), decay=0.2)
@@ -223,7 +223,7 @@ def render_music(chords, bass_roots, melody, lead_wave="square", bass_oct=-24,
                 m = chord[k % 3] + 12
                 x = square(note(m), d, 0.25) * env(int(SR * d), decay=0.08)
                 put(x * 0.12, t0 + k * d)
-        # melodi
+
         for off, m, ln in mel:
             if m is None:
                 continue
@@ -231,7 +231,7 @@ def render_music(chords, bass_roots, melody, lead_wave="square", bass_oct=-24,
             gen = square if lead_wave == "square" else tri
             x = gen(note(m), d) * env(int(SR * d), attack=0.01, decay=d * 0.6)
             put(fade_out(x, 0.01) * lead_vol, t0 + off * BEAT)
-        # drum
+
         if drums:
             for k in range(4):
                 d = 0.14
@@ -239,7 +239,8 @@ def render_music(chords, bass_roots, melody, lead_wave="square", bass_oct=-24,
                 put(kick * 0.8, t0 + k * BEAT)
             for k in range(8):
                 d = 0.04
-                hat = (lowpass(noise(d), 1) - lowpass(noise(d), 4)) * env(int(SR * d), decay=0.012)
+                hat = (lowpass(noise(d), 1) - lowpass(noise(d), 4)) * \
+                    env(int(SR * d), decay=0.012)
                 put(hat * (0.35 if k % 2 else 0.2), t0 + k * BEAT / 2)
             for k in (1, 3):
                 d = 0.16
@@ -258,7 +259,7 @@ def music_game():
         [(0, 77, 1), (1, 76, .5), (1.5, 72, .5), (2, 76, 1), (3, 72, 1)],
         [(0, 76, 1), (1, 79, .5), (1.5, 76, .5), (2, 72, 1), (3, 67, 1)],
         [(0, 74, 1), (1, 76, .5), (1.5, 74, .5), (2, 71, 2)],
-        # birama 5-8 (variasi lebih tinggi)
+
         [(0, 88, .5), (.5, 84, .5), (1, 81, 1), (2, 84, 1), (3, 81, 1)],
         [(0, 84, .5), (.5, 81, .5), (1, 77, 1), (2, 81, 1), (3, 77, 1)],
         [(0, 79, 1), (1, 84, .5), (1.5, 79, .5), (2, 76, 1), (3, 79, 1)],

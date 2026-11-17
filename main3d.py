@@ -1,16 +1,6 @@
-"""SAWIT SLAYER 3D - game edukasi karhutla (Ursina).
+from ursina import *
 
-Pemain (pemadam berpedang) menebang pohon sawit di labirin hutan sambil dikejar
-monster api (Hellish Banban). Monster mengejar memakai A* atau GBFS. Saat pemain
-mengambil air, monster berubah menjadi Baby Banban dan bisa dikalahkan; sebuah
-papan informasi tentang karhutla muncul.
-
-Logika game: core.py | algoritma: pathfinding.py | denah: level.py
-Jalankan:  python main3d.py
-"""
-from ursina import *          # noqa: F401,F403
-
-import json                   # diimpor setelah ursina agar tidak tertimpa
+import json
 import math
 import random
 from pathlib import Path
@@ -24,16 +14,16 @@ from sound import SoundManager
 
 BASE = Path(__file__).resolve().parent
 
-# ------------------------------------------------------------ konfigurasi ----
-CELL = 2.0                         # 1 sel labirin = 2 unit dunia
-WALL_H = 2.2                       # tinggi dinding semak
-POV_BACK, POV_UP, POV_PITCH = 11.8, 9.8, 30.0     # kamera di belakang pemadam
-TOP_DIST, TOP_PITCH = 46.0, 62.0   # kamera dari atas
+
+CELL = 2.0
+WALL_H = 2.2
+POV_BACK, POV_UP, POV_PITCH = 11.8, 9.8, 30.0
+TOP_DIST, TOP_PITCH = 46.0, 62.0
 CAM_FOV = 60
-# putar arah hadap pemadam bila terbalik (90 / 180 / -90)
+
 YAW_OFFSET = 0
-MONSTER_YAW_OFFSET = 0             # sama, untuk monster
-ATTACK_TIME = 0.5                  # lama animasi tebas (detik)
+MONSTER_YAW_OFFSET = 0
+ATTACK_TIME = 0.5
 CX, CZ = (COLS - 1) * CELL / 2, (ROWS - 1) * CELL / 2
 
 GRASS = (0.17, 0.80, 0.68)
@@ -94,8 +84,8 @@ def img_size(rel):
 
 class AppState:
     def __init__(self):
-        self.state = "menu"        # menu | play | settings | stats | end
-        self.overlay = None        # None | pause | info | settings
+        self.state = "menu"
+        self.overlay = None
         self.settings_from = "menu"
         self.algo, self.diff = "A*", "Medium"
         self.cam = "pov"
@@ -118,7 +108,7 @@ class AppState:
 
 
 S = AppState()
-snd = SoundManager(S)          # musik + efek suara (lihat sound.py)
+snd = SoundManager(S)
 game = None
 world = None
 dyn = None
@@ -142,7 +132,6 @@ except Exception:
     ASP = 16 / 9
 
 
-# ------------------------------------------------------------ helper UI ----
 def label(parent, text, x, y, size=1.0, col=None, font=None, origin=(0, 0), z=-0.02):
     try:
         t = Text(text=text, parent=parent, x=x, y=y, z=z, origin=origin, scale=size,
@@ -198,7 +187,6 @@ class Panel:
         return hit(parent, x, y, wf * self.w, hf * self.h, fn)
 
 
-# ---------------------------------------------------------- pustaka model ----
 class ModelLib:
     """Memuat model JSON hasil tools/build_assets.py menjadi Mesh Ursina (satu template per frame)."""
 
@@ -259,7 +247,7 @@ class Animated:
         self.anims = d["anims"] or {"static": [0, nframes, 1.0, False]}
         first = next(iter(self.anims))
         idxs = [self.anims[first][0]] if static else range(
-            nframes)   # static: 1 frame saja
+            nframes)
         self.root = Entity(parent=parent, position=position)
         self.root.scale = scale
         self.frames = {}
@@ -317,7 +305,6 @@ class Animated:
         self.root.hide()
 
 
-# --------------------------------------------------------------- dunia 3D ----
 def _quad(verts, uvs, cols, tris, pts, col, uv=((0, 0), (1, 0), (1, 1), (0, 1))):
     i = len(verts)
     verts.extend(pts)
@@ -341,13 +328,13 @@ def make_wall_mesh():
         _quad(verts, uvs, cols, tris, [Vec3(x0, h, z0), Vec3(
             x1, h, z0), Vec3(x1, h, z1), Vec3(x0, h, z1)], g)
         faces = []
-        if not nb(0, 1):   # selatan (-z)
+        if not nb(0, 1):
             faces.append(([(x0, z0), (x1, z0)], 0.86))
-        if not nb(0, -1):  # utara (+z)
+        if not nb(0, -1):
             faces.append(([(x1, z1), (x0, z1)], 0.64))
-        if not nb(1, 0):   # timur (+x)
+        if not nb(1, 0):
             faces.append(([(x1, z0), (x1, z1)], 0.76))
-        if not nb(-1, 0):  # barat (-x)
+        if not nb(-1, 0):
             faces.append(([(x0, z1), (x0, z0)], 0.70))
         for (a, c), sh in faces:
             for y0, y1, base in ((0, h - lip, DIRT), (h - lip, h, GRASS)):
@@ -454,7 +441,7 @@ def burst(pos, col):
 def build_viz(res, idx):
     verts, cols, tris = [], [], []
     col = GHOSTS[idx % 4]["col"]
-    off = idx * 0.004                         # cegah tumpang-tindih antar monster
+    off = idx * 0.004
 
     def quad(gx, gy, half, y, c):
         i = len(verts)
@@ -481,7 +468,6 @@ def build_viz(res, idx):
     return e
 
 
-# ------------------------------------------------------------ pemuatan ----
 _loading = Text(text="Memuat aset...", origin=(
     0, 0), scale=2.2, color=color.white)
 try:
@@ -492,7 +478,7 @@ lib.preload(["firefighter", "hellish_banban", "baby_banban", "water_drop", "palm
              "tree_a", "tree_b", "rock", "stump"])
 destroy(_loading)
 
-# ------------------------------------------------------------------ HUD ----
+
 hud = Entity(parent=camera.ui, enabled=False)
 lbl = {}
 
@@ -536,7 +522,6 @@ def flash(text, secs=1.4, col=None):
     msg_timer[0] = secs
 
 
-# --- minimap (pojok kanan atas, di bawah header) ---
 MM_CX, MM_CY, MM_W = 0.60, 0.245, 0.43
 mm_root = Entity(parent=hud)
 mm_frame, mmw, mmh = img(mm_root, "ui/frame_minimap.png",
@@ -628,7 +613,6 @@ def update_hud():
     update_minimap()
 
 
-# ------------------------------------------------------------------ menu ----
 menu = Entity(parent=camera.ui)
 img(menu, "ui/bg_start.jpg", 0, 0, w=ASP, h=1.0, z=1)
 MB = dict(w=0.13 * ASP, h=0.095)
@@ -637,7 +621,7 @@ for _v, _fn in ((0.476, lambda: start_game()), (0.611, lambda: open_settings_pag
     hit(menu, (0.522 - .5) * ASP, .5 - _v, MB["w"], MB["h"], _fn)
 label(menu, "Enter: mulai", 0.0, -0.475, 0.9, col=CREAM, font=FONT_TABLE)
 
-# ------------------------------------------------------- halaman settings ----
+
 settings_root = Entity(parent=camera.ui, enabled=False)
 set_bg = img(settings_root, "ui/bg.jpg", 0, 0, w=ASP, h=1.0, z=2)[0]
 set_dim = Entity(parent=settings_root, model="quad", color=Vec4(
@@ -699,9 +683,9 @@ def toggle_audio(k):
     else:
         S.sound = not S.sound
     refresh_settings()
-    snd.sync()                       # musik langsung berhenti / menyala
+    snd.sync()
     if k == "sound" and S.sound:
-        snd.sfx("click")             # contoh bunyi saat Sound dinyalakan
+        snd.sfx("click")
 
 
 set_panel.hit(settings_root, .608, .387, .215, .115, lambda: pick_algo("A*"))
@@ -715,7 +699,7 @@ set_panel.hit(settings_root, .397, .415, .12, .09,
               lambda: toggle_audio("sound"))
 set_panel.hit(settings_root, .524, .938, .10, .075, lambda: close_settings())
 
-# ---------------------------------------------------------- popup pause ----
+
 pause_root = Entity(parent=camera.ui, enabled=False, z=-3)
 Entity(parent=pause_root, model="quad", color=Vec4(0, 0, 0, 0.6),
        scale=(ASP * 1.1, 1.1), position=(0, 0, 1), collider="box")
@@ -727,7 +711,7 @@ pause_panel.hit(pause_root, .498, .613, .40, .11,
 pause_panel.hit(pause_root, .498, .772, .40, .11, lambda: go_menu())
 pause_panel.hit(pause_root, .507, .937, .15, .10, lambda: close_overlay())
 
-# ---------------------------------------------------------- popup info ----
+
 info_root = Entity(parent=camera.ui, enabled=False, z=-3)
 ghost_root = Entity(parent=camera.ui, enabled=False, z=-3)
 Entity(parent=ghost_root, model="quad", color=Vec4(0, 0, 0, 0.6),
@@ -776,7 +760,6 @@ def show_info():
     info_close.position = (w * 0.42, -0.02 + h * 0.42, -0.05)
 
 
-# ---------------------------------------------------------------- statistik ----
 stats_root = Entity(parent=camera.ui, enabled=False)
 img(stats_root, "ui/bg.jpg", 0, 0, w=ASP, h=1.0, z=2)
 Entity(parent=stats_root, model="quad", color=Vec4(
@@ -828,7 +811,6 @@ def open_stats():
     set_state("stats")
 
 
-# ----------------------------------------------------------- layar akhir ----
 end_root = Entity(parent=camera.ui, enabled=False)
 Entity(parent=end_root, model="quad", color=Vec4(0, 0, 0, 0.65),
        scale=(ASP * 1.1, 1.1), position=(0, 0, 1), collider="box")
@@ -861,7 +843,6 @@ def finish(kind):
     snd.sfx(kind, delay=0.3 if win else 0.45)
 
 
-# ---------------------------------------------------------------- alur state ----
 def set_camera_top():
     p = math.radians(TOP_PITCH)
     camera.position = Vec3(CX, TOP_DIST * math.sin(p),
@@ -894,7 +875,7 @@ def set_state(s):
     if s == "play":
         snd.music("game")
     elif s == "end":
-        snd.stop_music()             # diganti jingle menang / kalah
+        snd.stop_music()
     else:
         snd.music("menu")
 
@@ -930,7 +911,7 @@ def open_overlay(name, came_from=None):
 
 
 def close_settings():
-    if S.state == "settings":                      # halaman dari menu
+    if S.state == "settings":
         set_state("menu")
         return
     settings_root.enabled = False
@@ -962,7 +943,7 @@ def go_menu():
 def start_game():
     global game
     if game is not None and refs.get("viz"):
-        clear_all_viz()                  # hapus semua jalur dari permainan sebelumnya
+        clear_all_viz()
     game = Core(S.algo, S.diff, record=S.record)
     build_world()
     print("entities:", len(scene.entities))
@@ -974,7 +955,6 @@ def start_game():
     flash("SIAP!", 1.4)
 
 
-# -------------------------------------------------------------- input/update ----
 KEYS = {"left arrow": "L", "a": "L", "right arrow": "R", "d": "R", "up arrow": "F", "w": "F",
         "down arrow": "B", "s": "B"}
 ABS = {"L": (-1, 0), "R": (1, 0), "F": (0, -1), "B": (0, 1)}
@@ -984,7 +964,7 @@ def steer(code):
     if S.cam == "top":
         game.want_dir(ABS[code])
         return
-    # kamera belakang: kontrol relatif terhadap arah hadap
+
     fx, fy = game.face
     d = {"F": (fx, fy), "B": (-fx, -fy), "L": (fy, -fx), "R": (-fy, fx)}[code]
     game.want_dir(d)
@@ -1043,8 +1023,8 @@ def refresh_viz(idx):
     res = game.last.get(idx)
     f = game.fires[idx] if idx < len(game.fires) else None
     ok = (res and S.viz and f is not None
-          and f.state == "active"                    # monster mati: tanpa jalur
-          and game.water <= 0)                       # efek air aktif: tanpa jalur
+          and f.state == "active"
+          and game.water <= 0)
     if ok:
         refs["viz"][idx] = build_viz(res, idx)
 
@@ -1089,7 +1069,7 @@ def clear_viz(idx):
         destroy(old)
     refs["viz"][idx] = None
     if game is not None:
-        # supaya tombol V tidak menggambar ulang jalur lama
+
         game.last.pop(idx, None)
 
 
@@ -1132,14 +1112,14 @@ def sync_world(dt):
             m["h"].hide()
             m["b"].hide()
             if refs["viz"].get(f.idx) is not None or f.idx in g.last:
-                # monster mati -> jalurnya ikut hilang
+
                 clear_viz(f.idx)
             continue
         use_baby = frightened and not warn
         cur, other = (m["b"], m["h"]) if use_baby else (m["h"], m["b"])
         other.hide()
         cur.show()
-        # pasang ulang warna tiap frame (Baby Banban tidak diwarnai, Blinky tetap warna asli)
+
         if cur is m["h"] and i % 4 != 0:
             cur.root.setColorScale(*GHOSTS[i % 4]["col"], 1)
         else:
@@ -1156,7 +1136,7 @@ def sync_world(dt):
     for i, m in enumerate(refs["water"].values()):
         m.root.rotation_y += 120 * dt
         m.root.y = 0.9 + 0.15 * math.sin(tt * 3 + i)
-    # animasi pohon sawit tumbang
+
     for item in list(refs["fall"]):
         item[1] += dt
         k = min(1.0, item[1] / 0.45)

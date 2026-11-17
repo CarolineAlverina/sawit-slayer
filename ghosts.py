@@ -1,15 +1,14 @@
-"""Logika target 4 monster ala Pac-Man + data warna/tabel."""
 import math
 from level import COLS, ROWS, WALLS
 _WALLS = set(WALLS)
 _WALK = {(x, y) for y in range(ROWS) for x in range(COLS)
          if (x, y) not in _WALLS}
-SCATTER = (0, ROWS - 1)            # pojok yang dituju Clyde saat terlalu dekat
+SCATTER = (0, ROWS - 1)
 GHOSTS = [
-    dict(name="Blinky", nick="Shadow",  col=(1.00, 0.15, 0.15)),   # merah
-    dict(name="Pinky",  nick="Speedy",  col=(1.00, 0.55, 0.80)),   # pink
-    dict(name="Inky",   nick="Bashful", col=(0.20, 0.85, 1.00)),   # biru muda
-    dict(name="Clyde",  nick="Pokey",   col=(1.00, 0.60, 0.10)),   # oranye
+    dict(name="Blinky", nick="Shadow",  col=(1.00, 0.15, 0.15)),
+    dict(name="Pinky",  nick="Speedy",  col=(1.00, 0.55, 0.80)),
+    dict(name="Inky",   nick="Bashful", col=(0.20, 0.85, 1.00)),
+    dict(name="Clyde",  nick="Pokey",   col=(1.00, 0.60, 0.10)),
 ]
 
 GHOST_INFO = [
@@ -25,7 +24,6 @@ GHOST_INFO = [
 
 
 def snap(t):
-    """Target bisa jatuh di dinding / luar peta -> geser ke sel jalan terdekat."""
     x = min(max(int(round(t[0])), 0), COLS - 1)
     y = min(max(int(round(t[1])), 0), ROWS - 1)
     if (x, y) in _WALK:
@@ -33,22 +31,19 @@ def snap(t):
     return min(_WALK, key=lambda c: abs(c[0] - x) + abs(c[1] - y))
 
 
-CHASE_RANGE = 5          # <= 5 sel: kejar langsung, abaikan logika karakter
+CHASE_RANGE = 5
 
 
 def ghost_target(idx, g):
-    """Sel tujuan monster ke-idx. g = objek Core."""
     pc = tuple(g.player_cell())
     mc = tuple(g.fires[idx].m.cell)
 
-    # Jarak jalan di labirin; cadangan: jarak Manhattan
     d = g.distmap(pc).get(mc)
     if d is None:
         d = abs(pc[0] - mc[0]) + abs(pc[1] - mc[1])
     if d <= CHASE_RANGE:
-        return pc                                  # dekat: kejar langsung
+        return pc
 
-    # Jauh: pakai logika karakter masing-masing
     px, py = (int(round(v)) for v in g.player.pos())
     fx, fy = g.face
     kind = GHOSTS[idx % 4]["name"]
@@ -63,7 +58,7 @@ def ghost_target(idx, g):
         bx, by = g.fires[0].m.pos()
         pv = (px + 2 * fx, py + 2 * fy)
         t = (2 * pv[0] - bx, 2 * pv[1] - by)
-    else:                                          # Clyde
+    else:
         mx, my = g.fires[idx].m.pos()
         t = (px, py) if math.hypot(px - mx, py - my) > 8 else SCATTER
     return snap(t)
