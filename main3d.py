@@ -4,7 +4,9 @@ import json
 import math
 import random
 from pathlib import Path
+import textwrap
 
+from ghosts import GHOSTS, GHOST_INFO
 from core import DIFF_ORDER, WATER_TIME, Core
 from level import COLS, ROWS, WALK, WALLS
 from pathfinding import ALGOS, run_benchmark
@@ -12,16 +14,16 @@ from sound import SoundManager
 
 BASE = Path(__file__).resolve().parent
 
-# konfigurasi
-CELL = 2.0 
+
+CELL = 2.0
 WALL_H = 2.2
 POV_BACK, POV_UP, POV_PITCH = 11.8, 9.8, 30.0
-TOP_DIST, TOP_PITCH = 46.0, 62.0  
+TOP_DIST, TOP_PITCH = 46.0, 62.0
 CAM_FOV = 60
 
 YAW_OFFSET = 0
-MONSTER_YAW_OFFSET = 0            
-ATTACK_TIME = 0.5 
+MONSTER_YAW_OFFSET = 0
+ATTACK_TIME = 0.5
 CX, CZ = (COLS - 1) * CELL / 2, (ROWS - 1) * CELL / 2
 
 GRASS = (0.17, 0.80, 0.68)
@@ -90,7 +92,7 @@ class AppState:
         self.viz = False
         self.music, self.sound = True, True
         self.stats = {a: dict(n=0, nodes=0, plen=0, ms=0.0, fail=0)
-                    for a in ALGOS}
+                      for a in ALGOS}
         self.bench, self.bench_seed = None, 1
         self.info_order, self.info_pos = [], 0
 
@@ -130,14 +132,13 @@ except Exception:
     ASP = 16 / 9
 
 
-#  helper UI
 def label(parent, text, x, y, size=1.0, col=None, font=None, origin=(0, 0), z=-0.02):
     try:
         t = Text(text=text, parent=parent, x=x, y=y, z=z, origin=origin, scale=size,
                  color=col or color.white, **({"font": font} if font else {}))
     except Exception:
         t = Text(text=text, parent=parent, x=x, y=y, z=z,
-                origin=origin, scale=size, color=col or color.white)
+                 origin=origin, scale=size, color=col or color.white)
     return t
 
 
@@ -153,6 +154,7 @@ def img(parent, rel, x=0.0, y=0.0, w=None, h=None, z=0.0):
 
 
 def clicked(fn):
+    """Bungkus aksi tombol supaya berbunyi 'klik' saat ditekan."""
     def _run():
         snd.sfx("click")
         fn()
@@ -161,16 +163,17 @@ def clicked(fn):
 
 def hit(parent, x, y, w, h, fn, z=-0.05):
     return Button(parent=parent, model="quad", color=CLEAR, highlight_color=Color(1, 1, 1, 0.2),
-                pressed_color=Vec4(1, 1, 1, 0.32), scale=(w, h), position=(x, y, z), on_click=clicked(fn))
+                  pressed_color=Vec4(1, 1, 1, 0.32), scale=(w, h), position=(x, y, z), on_click=clicked(fn))
 
 
 def icon_button(parent, rel, x, y, size, fn, z=-0.05):
     return Button(parent=parent, model="quad", texture=tex(rel), color=color.white,
-                highlight_color=Color(0.85, 0.85, 0.85, 1), pressed_color=Color(0.7, 0.7, 0.7, 1),
-                scale=(size, size), position=(x, y, z), on_click=clicked(fn))
+                  highlight_color=Color(0.85, 0.85, 0.85, 1), pressed_color=Color(0.7, 0.7, 0.7, 1),
+                  scale=(size, size), position=(x, y, z), on_click=clicked(fn))
 
 
 class Panel:
+    """Gambar panel dengan koordinat pecahan (u dari kiri, v dari atas) -> koordinat UI."""
 
     def __init__(self, parent, rel, x, y, h):
         self.entity, self.w, self.h = img(parent, rel, x, y, h=h)
@@ -184,8 +187,8 @@ class Panel:
         return hit(parent, x, y, wf * self.w, hf * self.h, fn)
 
 
-# lib model
 class ModelLib:
+    """Memuat model JSON hasil tools/build_assets.py menjadi Mesh Ursina (satu template per frame)."""
 
     def __init__(self):
         self.cache, self.shared, self.tpl = {}, {}, {}
@@ -244,7 +247,7 @@ class Animated:
         self.anims = d["anims"] or {"static": [0, nframes, 1.0, False]}
         first = next(iter(self.anims))
         idxs = [self.anims[first][0]] if static else range(
-            nframes)   # static: 1 frame saja
+            nframes)
         self.root = Entity(parent=parent, position=position)
         self.root.scale = scale
         self.frames = {}
@@ -302,7 +305,6 @@ class Animated:
         self.root.hide()
 
 
-# dunia 3D
 def _quad(verts, uvs, cols, tris, pts, col, uv=((0, 0), (1, 0), (1, 1), (0, 1))):
     i = len(verts)
     verts.extend(pts)
@@ -326,19 +328,19 @@ def make_wall_mesh():
         _quad(verts, uvs, cols, tris, [Vec3(x0, h, z0), Vec3(
             x1, h, z0), Vec3(x1, h, z1), Vec3(x0, h, z1)], g)
         faces = []
-        if not nb(0, 1):   # selatan (-z)
+        if not nb(0, 1):
             faces.append(([(x0, z0), (x1, z0)], 0.86))
-        if not nb(0, -1):  # utara (+z)
+        if not nb(0, -1):
             faces.append(([(x1, z1), (x0, z1)], 0.64))
-        if not nb(1, 0):   # timur (+x)
+        if not nb(1, 0):
             faces.append(([(x1, z0), (x1, z1)], 0.76))
-        if not nb(-1, 0):  # barat (-x)
+        if not nb(-1, 0):
             faces.append(([(x0, z1), (x0, z0)], 0.70))
         for (a, c), sh in faces:
             for y0, y1, base in ((0, h - lip, DIRT), (h - lip, h, GRASS)):
                 _quad(verts, uvs, cols, tris,
-                    [Vec3(a[0], y0, a[1]), Vec3(c[0], y0, c[1]),
-                    Vec3(c[0], y1, c[1]), Vec3(a[0], y1, a[1])],
+                      [Vec3(a[0], y0, a[1]), Vec3(c[0], y0, c[1]),
+                       Vec3(c[0], y1, c[1]), Vec3(a[0], y1, a[1])],
                       tuple(v * sh for v in base))
     return Mesh(vertices=verts, triangles=tris, uvs=uvs, colors=cols, mode="triangle")
 
@@ -366,26 +368,27 @@ def destroy_tree(e):
 
 def build_static_world():
     Entity(parent=world, model="plane", scale=(260, 1, 260),
-        position=(CX, -0.05, CZ), color=Vec4(*GRASS, 1))
+           position=(CX, -0.05, CZ), color=Vec4(*GRASS, 1))
     Entity(parent=world, model=make_floor_mesh(), double_sided=True)
     Entity(parent=world, model=make_wall_mesh(), double_sided=True)
     rnd = random.Random(4)
     x_lo, x_hi, z_lo, z_hi = -CELL, COLS * CELL, -CELL, ROWS * CELL
     placed = 0
     while placed < 70:
-        x, z = rnd.uniform(x_lo - 26, x_hi +26), rnd.uniform(z_lo - 22, z_hi + 22)
+        x, z = rnd.uniform(x_lo - 26, x_hi +
+                           26), rnd.uniform(z_lo - 22, z_hi + 22)
         if x_lo - 3 < x < x_hi + 3 and z_lo - 3 < z < z_hi + 3:
             continue
         kind = rnd.random()
         if kind < 0.5:
             m = Animated("tree_a" if kind < 0.25 else "tree_b", world,
-                        scale=rnd.uniform(0.9, 1.5), position=(x, 0, z), static=True)
+                         scale=rnd.uniform(0.9, 1.5), position=(x, 0, z), static=True)
         elif kind < 0.8:
             m = Animated("stump", world, scale=rnd.uniform(0.8, 1.3),
-                        position=(x, 0, z), static=True)
+                         position=(x, 0, z), static=True)
         else:
             m = Animated("rock", world, scale=rnd.uniform(0.35, 0.6),
-                        position=(x, 0, z), static=True)
+                         position=(x, 0, z), static=True)
         m.root.rotation_y = rnd.uniform(0, 360)
         placed += 1
 
@@ -404,7 +407,7 @@ def build_world():
     rnd = random.Random(5)
     for c in game.palms:
         m = Animated("palm", dyn, scale=rnd.uniform(0.85, 1.1),
-                    position=W(*c), static=True)
+                     position=W(*c), static=True)
         m.root.rotation_y = rnd.uniform(0, 360)
         refs["palm"][c] = m
     for c in game.waters:
@@ -428,44 +431,43 @@ def burst(pos, col):
     for i in range(10):
         a = i / 10 * math.tau
         s = Entity(parent=world, model="sphere", color=col,
-                scale=0.25, position=pos + Vec3(0, 1.0, 0))
+                   scale=0.25, position=pos + Vec3(0, 1.0, 0))
         s.animate_position(pos + Vec3(math.cos(a) * 1.6, 0.6 +
                            random.random() * 1.2, math.sin(a) * 1.6), duration=0.45)
         s.animate_scale(0, duration=0.5)
         destroy(s, delay=0.55)
 
 
-def build_viz(res):
+def build_viz(res, idx):
     verts, cols, tris = [], [], []
+    col = GHOSTS[idx % 4]["col"]
+    off = idx * 0.004
 
-    def quad(gx, gy, half, y, col):
+    def quad(gx, gy, half, y, c):
         i = len(verts)
         cx, cz = gx * CELL, (ROWS - 1 - gy) * CELL
         hh = half * CELL
         verts.extend([Vec3(cx - hh, y, cz - hh), Vec3(cx + hh, y, cz - hh),
-                    Vec3(cx + hh, y, cz + hh), Vec3(cx - hh, y, cz + hh)])
-        cols.extend([col] * 4)
+                     Vec3(cx + hh, y, cz + hh), Vec3(cx - hh, y, cz + hh)])
+        cols.extend([c] * 4)
         tris.extend([i, i + 1, i + 2, i, i + 2, i + 3])
 
-    base = {"A*": (0.27, 0.51, 1.0), "GBFS": (1.0, 0.59, 0.12)}[res.algo]
     for c in res.explored:
-        quad(c[0], c[1], 0.42, 0.06, Vec4(*base, 0.38))
+        quad(c[0], c[1], 0.42, 0.06 + off, Vec4(*col, 0.30))
     for c in res.path:
-        quad(c[0], c[1], 0.11, 0.1, Vec4(0.9, 0.15, 0.15, 1))
+        quad(c[0], c[1], 0.11, 0.10 + off, Vec4(*col, 1))
     if res.path:
-        quad(res.path[0][0], res.path[0][1],
-            0.22, 0.12, Vec4(0.9, 0.15, 0.15, 1))
+        quad(res.path[0][0], res.path[0][1], 0.22, 0.12 + off, Vec4(*col, 1))
         quad(res.path[-1][0], res.path[-1][1],
-            0.22, 0.12, Vec4(0.25, 0.5, 1.0, 1))
+             0.22, 0.13 + off, Vec4(1, 1, 1, 1))
     if not verts:
         return None
     e = Entity(parent=world, model=Mesh(vertices=verts, triangles=tris,
-            colors=cols, mode="triangle"), double_sided=True)
+               colors=cols, mode="triangle"), double_sided=True)
     e.setTransparency(True)
     return e
 
 
-# loadig
 _loading = Text(text="Memuat aset...", origin=(
     0, 0), scale=2.2, color=color.white)
 try:
@@ -473,10 +475,10 @@ try:
 except Exception:
     pass
 lib.preload(["firefighter", "hellish_banban", "baby_banban", "water_drop", "palm",
-            "tree_a", "tree_b", "rock", "stump"])
+             "tree_a", "tree_b", "rock", "stump"])
 destroy(_loading)
 
-# HUD
+
 hud = Entity(parent=camera.ui, enabled=False)
 lbl = {}
 
@@ -505,7 +507,7 @@ bar_x0 = wb.x + (BAR_U0 - .5) * wbw
 bar_x1 = wb.x + (BAR_U1 - .5) * wbw
 bar_h = 0.155 * wbh
 water_cover = Entity(parent=hud, model="quad", color=rgb(30, 36, 52), scale=(0.001, bar_h), position=(bar_x1, wb.y, -0.03),
-                    origin_x=0.5)
+                     origin_x=0.5)
 lbl["hint"] = label(hud, "W/A/S/D atau panah: gerak   TAB: algoritma   V: jalur   C: kamera",
                     0.30, -0.4575, 0.85, col=CREAM, font=FONT_TABLE)
 msg = label(camera.ui, " ", 0.0, 0.31, 2.4, col=CREAM, font=FONT_MAIN, z=-0.5)
@@ -520,12 +522,14 @@ def flash(text, secs=1.4, col=None):
     msg_timer[0] = secs
 
 
-#minimap
 MM_CX, MM_CY, MM_W = 0.60, 0.245, 0.43
 mm_root = Entity(parent=hud)
 mm_frame, mmw, mmh = img(mm_root, "ui/frame_minimap.png",
                          MM_CX, MM_CY, w=MM_W, z=-0.04)
 MM_CS = min(mmw * 0.94 / COLS, mmh * 0.91 / ROWS)
+
+player_dot = Entity(parent=mm_root, model="circle", color=rgb(255, 230, 30),
+                    scale=MM_CS * 1.0, position=(MM_CX, MM_CY, -0.09))
 MM_OX, MM_OY = MM_CX - COLS * MM_CS / 2, MM_CY + ROWS * MM_CS / 2
 
 
@@ -541,38 +545,35 @@ def make_minimap_mesh():
             col = Vec4(0.12, 0.30, 0.95, 1) if (
                 gx, gy) in WALLS else Vec4(0.04, 0.04, 0.10, 0.92)
             i = len(verts)
-            verts.extend([Vec3(x, y - MM_CS, 0), Vec3(x + MM_CS, y - MM_CS, 0), Vec3(x + MM_CS, y, 0), Vec3(x, y, 0)])
+            verts.extend([Vec3(x, y - MM_CS, 0), Vec3(x + MM_CS,
+                         y - MM_CS, 0), Vec3(x + MM_CS, y, 0), Vec3(x, y, 0)])
             cols.extend([col] * 4)
             tris.extend([i, i + 1, i + 2, i, i + 2, i + 3])
     return Mesh(vertices=verts, triangles=tris, colors=cols, mode="triangle")
 
 
 Entity(parent=mm_root, model=make_minimap_mesh(), z=-0.02)
-mm = dict(palm={}, water={}, fires=[], player=None)
+mm = dict(palm={}, water={}, fires=[], box=None)
 
 
 def build_minimap_markers():
-    for grp in ("palm", "water"):
-        for e in mm[grp].values():
-            destroy(e)
-    for e in mm["fires"]:
-        destroy(e)
-    if mm["player"] is not None:
-        destroy(mm["player"])
+    if mm["box"] is not None:
+        destroy_tree(mm["box"])
+    box = Entity(parent=mm_root)
+    mm["box"] = box
     mm["palm"], mm["water"], mm["fires"] = {}, {}, []
     for c in game.palms:
         x, y = mm_pos(*c)
-        mm["palm"][c] = Entity(parent=mm_root, model="quad", color=rgb(
+        mm["palm"][c] = Entity(parent=box, model="quad", color=rgb(
             255, 160, 40), scale=MM_CS * 0.32, position=(x, y, -0.06))
     for c in game.waters:
         x, y = mm_pos(*c)
-        mm["water"][c] = Entity(parent=mm_root, model="circle", color=rgb(
+        mm["water"][c] = Entity(parent=box, model="circle", color=rgb(
             80, 200, 255), scale=MM_CS * 0.85, position=(x, y, -0.07))
-    for _ in game.fires:
-        mm["fires"].append(Entity(parent=mm_root, model="circle", color=rgb(
-            235, 40, 40), scale=MM_CS * 0.9, position=(0, 0, -0.08)))
-    mm["player"] = Entity(parent=mm_root, model="circle", color=rgb(
-        255, 230, 30), scale=MM_CS * 1.0, position=(0, 0, -0.09))
+    for f in game.fires:
+        x, y = mm_pos(*f.m.pos())
+        mm["fires"].append(Entity(parent=box, model="circle", color=rgb(
+            235, 40, 40), scale=MM_CS * 0.9, position=(x, y, -0.08)))
 
 
 def update_minimap():
@@ -581,13 +582,15 @@ def update_minimap():
         e.enabled = c in g.palms
     for c, e in mm["water"].items():
         e.enabled = c in g.waters
-    for f, e in zip(g.fires, mm["fires"]):
+    for i, (f, e) in enumerate(zip(g.fires, mm["fires"])):
         e.enabled = f.state == "active"
         x, y = mm_pos(*f.m.pos())
         e.position = (x, y, -0.08)
-        e.color = rgb(90, 190, 255) if g.water > 0 else rgb(235, 40, 40)
+        e.color = rgb(90, 190, 255) if g.water > 0 else Vec4(
+            *GHOSTS[i % 4]["col"], 1)
     px, py = g.player.pos()
-    mm["player"].position = (*mm_pos(px, py), -0.09)
+    x, y = mm_pos(px, py)
+    player_dot.position = (x, y, -0.09)
 
 
 def apply_minimap_visibility():
@@ -610,7 +613,6 @@ def update_hud():
     update_minimap()
 
 
-# menu
 menu = Entity(parent=camera.ui)
 img(menu, "ui/bg_start.jpg", 0, 0, w=ASP, h=1.0, z=1)
 MB = dict(w=0.13 * ASP, h=0.095)
@@ -619,7 +621,7 @@ for _v, _fn in ((0.476, lambda: start_game()), (0.611, lambda: open_settings_pag
     hit(menu, (0.522 - .5) * ASP, .5 - _v, MB["w"], MB["h"], _fn)
 label(menu, "Enter: mulai", 0.0, -0.475, 0.9, col=CREAM, font=FONT_TABLE)
 
-# halaman settings
+
 settings_root = Entity(parent=camera.ui, enabled=False)
 set_bg = img(settings_root, "ui/bg.jpg", 0, 0, w=ASP, h=1.0, z=2)[0]
 set_dim = Entity(parent=settings_root, model="quad", color=Vec4(
@@ -635,8 +637,8 @@ def hl_quad(u, v, wf, hf):
 
 
 for _k, (u, v, wf, hf) in {"A*": (.608, .387, .215, .115), "GBFS": (.840, .387, .215, .115),
-                        "Easy": (.284, .774, .17, .08), "Medium": (.500, .774, .17, .08),
-                        "Hard": (.717, .774, .17, .08)}.items():
+                           "Easy": (.284, .774, .17, .08), "Medium": (.500, .774, .17, .08),
+                           "Hard": (.717, .774, .17, .08)}.items():
     set_hl[_k] = hl_quad(u, v, wf, hf)
 toggle_parts = {}
 for _k, v in (("music", .298), ("sound", .415)):
@@ -690,14 +692,14 @@ set_panel.hit(settings_root, .608, .387, .215, .115, lambda: pick_algo("A*"))
 set_panel.hit(settings_root, .840, .387, .215, .115, lambda: pick_algo("GBFS"))
 for _d, _u in (("Easy", .284), ("Medium", .500), ("Hard", .717)):
     set_panel.hit(settings_root, _u, .774, .17, .08,
-                (lambda d=_d: pick_diff(d)))
+                  (lambda d=_d: pick_diff(d)))
 set_panel.hit(settings_root, .397, .298, .12, .09,
-                lambda: toggle_audio("music"))
+              lambda: toggle_audio("music"))
 set_panel.hit(settings_root, .397, .415, .12, .09,
-                lambda: toggle_audio("sound"))
+              lambda: toggle_audio("sound"))
 set_panel.hit(settings_root, .524, .938, .10, .075, lambda: close_settings())
 
-#popup pause
+
 pause_root = Entity(parent=camera.ui, enabled=False, z=-3)
 Entity(parent=pause_root, model="quad", color=Vec4(0, 0, 0, 0.6),
        scale=(ASP * 1.1, 1.1), position=(0, 0, 1), collider="box")
@@ -709,12 +711,36 @@ pause_panel.hit(pause_root, .498, .613, .40, .11,
 pause_panel.hit(pause_root, .498, .772, .40, .11, lambda: go_menu())
 pause_panel.hit(pause_root, .507, .937, .15, .10, lambda: close_overlay())
 
-# ---------------------------------------------------------- popup info ----
+
 info_root = Entity(parent=camera.ui, enabled=False, z=-3)
+ghost_root = Entity(parent=camera.ui, enabled=False, z=-3)
+Entity(parent=ghost_root, model="quad", color=Vec4(0, 0, 0, 0.6),
+       scale=(ASP * 1.1, 1.1), position=(0, 0, 1), collider="box")
+Entity(parent=ghost_root, model="quad", color=Vec4(0.05, 0.05, 0.1, 0.95),
+       scale=(1.62, 0.62), position=(0, 0, 0.5))
+label(ghost_root, "Karakter Monster", 0, 0.25, 1.5, col=CREAM, font=FONT_MAIN)
+_gx = [-0.78, -0.63, -0.46, 0.12]
+for _x, _h in zip(_gx, ["Ghost", "Name", "Target Logic", "Behavior"]):
+    label(ghost_root, _h, _x, 0.17, 0.9, col=color.azure,
+          font=FONT_TABLE, origin=(-.5, 0))
+for _i, (_n, _nick, _tl, _bh) in enumerate(GHOST_INFO):
+    _y = 0.07 - _i * 0.11
+    _c = Vec4(*GHOSTS[_i]["col"], 1)
+    label(ghost_root, _n, _gx[0], _y, 1.0, col=_c,
+          font=FONT_TABLE, origin=(-.5, 0))
+    label(ghost_root, _nick, _gx[1], _y, 0.85,
+          font=FONT_TABLE, origin=(-.5, 0))
+    label(ghost_root, textwrap.fill(_tl, 34),
+          _gx[2], _y, 0.8, font=FONT_TABLE, origin=(-.5, 0))
+    label(ghost_root, textwrap.fill(_bh, 30),
+          _gx[3], _y, 0.8, font=FONT_TABLE, origin=(-.5, 0))
+icon_button(ghost_root, "ui/icon_close.png", 0.78,
+            0.27, 0.075, lambda: close_overlay())
 Entity(parent=info_root, model="quad", color=Vec4(0, 0, 0, 0.55),
        scale=(ASP * 1.1, 1.1), position=(0, 0, 1), collider="box")
 info_board = Entity(parent=info_root, model="quad", position=(0, -0.02, 0))
-info_close = icon_button(info_root, "ui/icon_close.png", 0, 0, 0.075, lambda: close_overlay())
+info_close = icon_button(info_root, "ui/icon_close.png",
+                         0, 0, 0.075, lambda: close_overlay())
 INFO_H = 0.70
 label(info_root, "Tahukah kamu?", 0, 0.40, 1.5, col=CREAM, font=FONT_MAIN)
 
@@ -734,7 +760,6 @@ def show_info():
     info_close.position = (w * 0.42, -0.02 + h * 0.42, -0.05)
 
 
-#statistik
 stats_root = Entity(parent=camera.ui, enabled=False)
 img(stats_root, "ui/bg.jpg", 0, 0, w=ASP, h=1.0, z=2)
 Entity(parent=stats_root, model="quad", color=Vec4(
@@ -751,7 +776,8 @@ def open_stats():
     S.bench = run_benchmark(WALK, S.bench_seed)
 
     def cell(text, x, y, col=None, size=0.9, font=FONT_TABLE):
-        stats_items.append(label(stats_root, text, x, y, size, col or color.white, font, origin=(-.5, 0)))
+        stats_items.append(label(stats_root, text, x, y, size,
+                           col or color.white, font, origin=(-.5, 0)))
 
     cell("Perbandingan A* vs GBFS", -0.72, 0.42, CREAM, 2.0, FONT_MAIN)
     cell(
@@ -781,11 +807,10 @@ def open_stats():
             cell(str(v), x, y, size=0.85)
         y -= .036
     cell("A* menjamin jalur terpendek; GBFS biasanya memeriksa lebih sedikit node tetapi jalurnya bisa lebih panjang.",
-        -0.72, -0.45, color.light_gray, 0.8)
+         -0.72, -0.45, color.light_gray, 0.8)
     set_state("stats")
 
 
-# layar akhir
 end_root = Entity(parent=camera.ui, enabled=False)
 Entity(parent=end_root, model="quad", color=Vec4(0, 0, 0, 0.65),
        scale=(ASP * 1.1, 1.1), position=(0, 0, 1), collider="box")
@@ -818,7 +843,6 @@ def finish(kind):
     snd.sfx(kind, delay=0.3 if win else 0.45)
 
 
-#alur state
 def set_camera_top():
     p = math.radians(TOP_PITCH)
     camera.position = Vec3(CX, TOP_DIST * math.sin(p),
@@ -834,7 +858,7 @@ def set_state(s):
     settings_root.enabled = s == "settings"
     stats_root.enabled = s == "stats"
     end_root.enabled = s == "end"
-    pause_root.enabled = info_root.enabled = False
+    pause_root.enabled = info_root.enabled = ghost_root.enabled = False
     if world is not None:
         world.enabled = s in ("play", "end")
     camera.position = Vec3(0, 0, -20)
@@ -851,7 +875,7 @@ def set_state(s):
     if s == "play":
         snd.music("game")
     elif s == "end":
-        snd.stop_music()             
+        snd.stop_music()
     else:
         snd.music("menu")
 
@@ -880,6 +904,8 @@ def open_overlay(name, came_from=None):
     elif name == "info":
         show_info()
         info_root.enabled = True
+    elif name == "ghost":
+        ghost_root.enabled = True
     S.overlay = name
     game.paused = True
 
@@ -907,6 +933,7 @@ def close_overlay():
     S.overlay = None
     if game is not None:
         game.paused = False
+    ghost_root.enabled = False
 
 
 def go_menu():
@@ -915,6 +942,8 @@ def go_menu():
 
 def start_game():
     global game
+    if game is not None and refs.get("viz"):
+        clear_all_viz()
     game = Core(S.algo, S.diff, record=S.record)
     build_world()
     print("entities:", len(scene.entities))
@@ -926,7 +955,6 @@ def start_game():
     flash("SIAP!", 1.4)
 
 
-# input/update
 KEYS = {"left arrow": "L", "a": "L", "right arrow": "R", "d": "R", "up arrow": "F", "w": "F",
         "down arrow": "B", "s": "B"}
 ABS = {"L": (-1, 0), "R": (1, 0), "F": (0, -1), "B": (0, 1)}
@@ -936,6 +964,7 @@ def steer(code):
     if S.cam == "top":
         game.want_dir(ABS[code])
         return
+
     fx, fy = game.face
     d = {"F": (fx, fy), "B": (-fx, -fy), "L": (fy, -fx), "R": (-fy, fx)}[code]
     game.want_dir(d)
@@ -956,7 +985,7 @@ def input(key):
         elif key == "tab":
             pick_algo("GBFS" if game.algo == "A*" else "A*")
             flash(f"Algoritma: {game.algo}", 1.0,
-                color.azure if game.algo == "A*" else color.orange)
+                  color.azure if game.algo == "A*" else color.orange)
         elif key in ("1", "2"):
             pick_algo(ALGOS[int(key) - 1])
         elif key == "v":
@@ -980,7 +1009,7 @@ def input(key):
             open_stats()
         elif key == "c":
             S.stats = {a: dict(n=0, nodes=0, plen=0, ms=0.0, fail=0)
-                    for a in ALGOS}
+                       for a in ALGOS}
             open_stats()
         elif key == "escape":
             set_state("menu")
@@ -990,8 +1019,14 @@ def refresh_viz(idx):
     old = refs["viz"].get(idx)
     if old is not None:
         destroy(old)
+    refs["viz"][idx] = None
     res = game.last.get(idx)
-    refs["viz"][idx] = build_viz(res) if (res and S.viz) else None
+    f = game.fires[idx] if idx < len(game.fires) else None
+    ok = (res and S.viz and f is not None
+          and f.state == "active"
+          and game.water <= 0)
+    if ok:
+        refs["viz"][idx] = build_viz(res, idx)
 
 
 def handle_events():
@@ -1013,6 +1048,7 @@ def handle_events():
             open_overlay("info")
         elif kind == "extinguish":
             idx, gp = data
+            clear_viz(idx)
             burst(W(*gp), color.azure)
             snd.sfx("extinguish")
             flash("+200", 0.8, color.white)
@@ -1025,6 +1061,21 @@ def handle_events():
         elif kind in ("win", "lose"):
             finish(kind)
     game.events.clear()
+
+
+def clear_viz(idx):
+    old = refs["viz"].get(idx)
+    if old is not None:
+        destroy(old)
+    refs["viz"][idx] = None
+    if game is not None:
+
+        game.last.pop(idx, None)
+
+
+def clear_all_viz():
+    for k in list(refs["viz"]):
+        clear_viz(k)
 
 
 def sync_world(dt):
@@ -1056,15 +1107,23 @@ def sync_world(dt):
 
     frightened = g.water > 0
     warn = frightened and g.water < 2.0 and int(tt * 6) % 2 == 0
-    for f, m in zip(g.fires, refs["mon"]):
+    for i, (f, m) in enumerate(zip(g.fires, refs["mon"])):
         if f.state != "active":
             m["h"].hide()
             m["b"].hide()
+            if refs["viz"].get(f.idx) is not None or f.idx in g.last:
+
+                clear_viz(f.idx)
             continue
         use_baby = frightened and not warn
         cur, other = (m["b"], m["h"]) if use_baby else (m["h"], m["b"])
         other.hide()
         cur.show()
+
+        if cur is m["h"] and i % 4 != 0:
+            cur.root.setColorScale(*GHOSTS[i % 4]["col"], 1)
+        else:
+            cur.root.setColorScale(1, 1, 1, 1)
         fx, fy = f.m.pos()
         cur.root.position = W(fx, fy)
         m["yaw"] = approach_angle(m["yaw"], heading_yaw(
@@ -1077,7 +1136,7 @@ def sync_world(dt):
     for i, m in enumerate(refs["water"].values()):
         m.root.rotation_y += 120 * dt
         m.root.y = 0.9 + 0.15 * math.sin(tt * 3 + i)
-    # animasi pohon sawit tumbang
+
     for item in list(refs["fall"]):
         item[1] += dt
         k = min(1.0, item[1] / 0.45)

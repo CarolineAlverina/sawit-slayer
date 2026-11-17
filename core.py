@@ -2,6 +2,7 @@ import math
 import random
 
 from level import FIRE_SPAWNS, PALMS, PLAYER_START, WALK, WATERS
+from ghosts import ghost_target
 from pathfinding import bfs_distances, search
 
 PLAYER_SPEED = 5.0
@@ -9,10 +10,10 @@ WATER_TIME = 8.0
 FLEE_SLOW = 0.65
 START_LIVES = 3
 PTS_PALM, PTS_WATER, PTS_FIRE = 10, 50, 200
-# Semua tingkat kesulitan memulai dengan 4 monster
-DIFFS = {"Easy": dict(fires=4, speed=2.8),
+
+DIFFS = {"Easy": dict(fires=4, speed=1.8),
          "Medium": dict(fires=4, speed=3.6),
-         "Hard": dict(fires=4, speed=4.4)}
+         "Hard": dict(fires=4, speed=5.4)}
 DIFF_ORDER = list(DIFFS)
 
 
@@ -58,7 +59,7 @@ class Core:
         self.palms, self.waters = set(PALMS), set(WATERS)
         self.total = len(PALMS)
         self.score, self.lives = 0, START_LIVES
-        self.over = None 
+        self.over = None
         self.paused = False
         self.time, self.water = 0.0, 0.0
         self.last, self.last_res = {}, None
@@ -66,7 +67,6 @@ class Core:
         self._dist = (None, None)
         self.reset_positions()
 
-    # ---
     def reset_positions(self):
         self.player = Mover(PLAYER_START)
         self.dir = self.want = (0, 0)
@@ -75,6 +75,7 @@ class Core:
                       for i in range(self.diff["fires"])]
         self.freeze, self.invuln, self.water = 1.5, 2.0, 0.0
         self.last = {}
+        self.events.append(("reset", None))
 
     def set_algo(self, algo):
         self.algo = algo
@@ -95,7 +96,6 @@ class Core:
     def want_dir(self, d):
         self.want = d
 
-    # ---
     def update(self, dt):
         if self.over or self.paused:
             return
@@ -162,7 +162,7 @@ class Core:
                 return
         else:
             f.flee = None
-            goal = pc
+            goal = ghost_target(f.idx, self)
             if goal == f.m.cell:
                 return
         res = search(WALK, f.m.cell, goal, self.algo)
