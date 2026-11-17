@@ -1,3 +1,9 @@
+"""Modul pencarian jalur FireGuard: A* dan Greedy Best-First Search (GBFS).
+
+Murni Python (tanpa Pygame) supaya mudah diuji.
+Grid: list[list[bool]] dengan True = bisa dilewati. Biaya tiap langkah = 1.
+Heuristic: Manhattan distance  h(n) = |x1-x2| + |y1-y2|.
+"""
 import heapq
 import itertools
 import random
@@ -7,7 +13,10 @@ from collections import deque, namedtuple
 ALGOS = ("A*", "GBFS")
 DIRS = ((1, 0), (-1, 0), (0, 1), (0, -1))
 
-
+# path     : list sel dari start ke goal ([] bila gagal)
+# nodes    : jumlah node yang diekspansi
+# ms       : waktu komputasi (milidetik)
+# explored : urutan node yang diekspansi (untuk visualisasi)
 Result = namedtuple("Result", "path nodes ms explored ok algo")
 
 
@@ -28,7 +37,7 @@ def search(walk, start, goal, algo="A*"):
     """Jalankan A* (f = g + h) atau GBFS (f = h)."""
     t0 = time.perf_counter()
     astar = algo == "A*"
-    counter = itertools.count()          
+    counter = itertools.count()          # tie-breaker stabil untuk heap
     h0 = manhattan(start, goal)
     heap = [(h0, h0, next(counter), start)]
     g = {start: 0}
@@ -52,12 +61,12 @@ def search(walk, start, goal, algo="A*"):
             h = manhattan(nb, goal)
             if astar:
                 ng = g[cur] + 1
-                if ng < g.get(nb, 1 << 30):       
+                if ng < g.get(nb, 1 << 30):       # perbarui biaya & parent bila lebih baik
                     g[nb] = ng
                     parent[nb] = cur
                     heapq.heappush(heap, (ng + h, h, next(counter), nb))
             else:
-                if nb in parent:
+                if nb in parent:                  # GBFS: cukup sekali dikunjungi
                     continue
                 parent[nb] = cur
                 heapq.heappush(heap, (h, h, next(counter), nb))
@@ -86,25 +95,25 @@ def bfs_distances(walk, start):
     return dist
 
 
-# benchmark
+# ---------------------------------------------------------------- benchmark --
 def make_scenarios(maze_walk, w=21, h=15):
     def empty():
         return [[0 < x < w - 1 and 0 < y < h - 1 for x in range(w)] for y in range(h)]
 
-    s1 = empty()
+    s1 = empty()                                   # tanpa rintangan
 
-    s2 = empty()
+    s2 = empty()                                   # jalur langsung terhalang
     for y in range(2, h - 2):
         s2[y][w // 2] = False
 
-    s3 = empty()
+    s3 = empty()                                   # banyak rintangan
     rnd = random.Random(7)
     for y in range(1, h - 1):
         for x in range(1, w - 1):
             if rnd.random() < 0.22:
                 s3[y][x] = False
 
-    s4 = empty()
+    s4 = empty()                                   # jalur berliku (ular)
     for y in range(2, h - 2, 2):
         for x in range(1, w - 1):
             s4[y][x] = False
